@@ -271,6 +271,17 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
     return C
 end
 
+function SC_rho_opt(psi, Nx, Ny)
+    lat = square_lattice(Nx, Ny, yperiodic = true)
+    A = zeros(length(lat), length(lat))
+    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Adn", "Aup")
+    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Aup", "Adn")
+    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Aup", "Adn") #here I put a plus instead of a minus and it works!
+    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Adn", "Aup")
+    return 1/2 .*(A)
+end
+
+
 function SC_rho(psi, Nx, Ny)
 
     ITensors.Strided.set_num_threads(1)
@@ -288,10 +299,10 @@ function SC_rho(psi, Nx, Ny)
             if intersect([b1.s1 b1.s2], [b2.s1 b2.s2]) == [] #exclude bonds sharing a common site
                 
                 os = OpSum()            
-                #os += 1/2,"Cdagup", b1.s1, "Cdagdn", b1.s2, "Cdn", b2.s1, "Cup", b2.s2
+                os += 1/2,"Cdagup", b1.s1, "Cdagdn", b1.s2, "Cdn", b2.s1, "Cup", b2.s2
                 os += 1/2,"Cdagdn", b1.s1, "Cdagup", b1.s2, "Cup", b2.s1, "Cdn", b2.s2
-                #os += -1/2,"Cdagup", b1.s1, "Cdagdn", b1.s2, "Cup", b2.s1, "Cdn", b2.s2
-                #os += -1/2,"Cdagdn", b1.s1, "Cdagup", b1.s2, "Cdn", b2.s1, "Cup", b2.s2
+                os += -1/2,"Cdagup", b1.s1, "Cdagdn", b1.s2, "Cup", b2.s1, "Cdn", b2.s2
+                os += -1/2,"Cdagdn", b1.s1, "Cdagup", b1.s2, "Cdn", b2.s1, "Cup", b2.s2
                 
                 corr = MPO(os, sites)
                 corr = splitblocks(linkinds,corr)
@@ -303,11 +314,12 @@ function SC_rho(psi, Nx, Ny)
     return C
 end
 
-Nx=6; Ny=4; o1 = "Adagdn"; o2 = "Adagup"; o3 = "Aup"; o4 = "Adn"
-@time C_1=correlation_matrix_bond(psi, Nx, Ny, o1, o2, o3, o4)
+#Nx=3; Ny=3; #o1 = "Adagdn"; o2 = "Adagup"; o3 = "Aup"; o4 = "Adn"
+#@time C_1=correlation_matrix_bond(psi, Nx, Ny, o1, o2, o3, o4)
 #VSCodeServer.@profview correlation_matrix_bond(psi, Nx, Ny, o1, o2, o3, o4)
+@time C_1=(SC_rho_opt(psi, Nx, Ny))
 @time C_2=(SC_rho(psi, Nx, Ny))'
-a=2 .* C_2[findall(>=(1e-12),abs.(C_2))]
+a=C_2[findall(>=(1e-12),abs.(C_2))]
 b=C_1[findall(>=(1e-12),abs.(C_1))]
 @show findall(>=(1e-8), abs.(a .-b))
 
@@ -341,6 +353,17 @@ plt.scatter([1,5,10,20,40,80,120],[920,710,642,629,709,1070,2033], label = "L=8"
 plt.plot([5,10,20,40],[1616,1399,1377,1438])
 plt.scatter([5,10,20,40],[1616,1399,1377,1438], label= "L=16")
 plt.xlabel("# threads")
+plt.ylabel("time")
+plt.legend()
+
+
+plt.figure(1, dpi=100)
+plt.title("Scaling time bond correlator maxlinkdim=200, lattice *x4")
+plt.plot([8,12,16,20,24,28],[1.16,5.771,35.36,67.39,162.81,259.12])
+plt.scatter([8,12,16,20,24,28],[1.16,5.771,35.36,67.39,162.81,259.12], label="MPO")
+plt.plot([8,12,16,20,24,28],4 .*[0.64,1.74,3.25,5.84,8.59,13.24])
+plt.scatter([8,12,16,20,24,28],4 .*[0.64,1.74,3.25,5.84,8.59,13.24], label="OPT")
+plt.xlabel("sites")
 plt.ylabel("time")
 plt.legend()
 =#
