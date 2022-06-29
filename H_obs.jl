@@ -37,7 +37,7 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
         for M in neigh #choose second site (o2)
             if (M==Ny && i>(N-Ny)) continue end #last column: no H bond
 
-            println("(o1,o2):($i,$(i+M))")
+            #println("(o1,o2):($i,$(i+M))")
             L_t = copy(L) #copy unnecessary
             for str in 1:(M-1) #insert JW string between o1 and o2
                 L_t = L_t* apply(op("F", s[i + str]), psi[i + str]) * psi_dag[i + str] 
@@ -53,7 +53,7 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
                 for O in neigh_j #vertical-horizontal second bond, choose fourth site
                     if (O==1 && j%Ny==0) continue end #new column: no V bond
                     if (O==Ny && j>(N-Ny)) continue end #last column: no H bond
-                    println("(o3,o4):($j,$(j+O))")
+                    #println("(o3,o4):($j,$(j+O))")
 
                     op_psi_j1 =  apply(op(j_4, s[j+O]), apply(op(o4,s[j+O]),psi[j+O])) #apply o4
 
@@ -63,7 +63,7 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
                     end        
                     R = R * op_psi_j * psi_dag[j] 
 
-                    C[get(indx,(i,i+M),0),get(indx,(j,j+O),0)] = @show pf*inner(dag(L_t),R) #get matrix element
+                    C[get(indx,(i,i+M),0),get(indx,(j,j+O),0)] = pf*inner(dag(L_t),R) #get matrix element
                 end
                 L_t = L_t * psi[j] * psi_dag[j]  #update left tensor (EFFICIENT PART)
             end
@@ -94,13 +94,13 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
 
         L = (i>1 ? delta(dag(l[i-1])',l[i-1]) : 1.) * op_psi_i * psi_dag[i] #left system 
         R = (i+Ny < (length(psi)) ? delta(dag(l[i+Ny]),l[i+Ny]') : 1.) * op_psi_i1 * psi_dag[i+Ny] #right system
-        println("(o1,o2):($i,$(i+Ny))")
+        #println("(o1,o2):($i,$(i+Ny))")
 
         for j in (i+1):(i+Ny-2) #choose third site
             if (j%Ny==0) #skip bond if it would go to another column
                 L = L * apply(op("F", s[j]), psi[j]) * psi_dag[j] 
             continue end 
-            println("(o3,o4):($j,$(j+1))")
+            #println("(o3,o4):($j,$(j+1))")
             L_t = copy(L)
             op_psi_j = apply(op(j_3, s[j]),apply(op(o3,s[j]), psi[j])) #apply o3
             op_psi_j1 = apply(op(j_4, s[j+1]),apply(op(o4,s[j+1]), psi[j+1])) #apply o4 (always V bond)
@@ -108,7 +108,7 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
             for k in (j+2):(i+Ny-1) #add empty sites between o4 and o2
                 L_t = L_t * psi_dag[k] * apply(op("F", s[k]), psi[k])
             end
-            C[get(indx,(i,i+Ny),0),get(indx,(j,j+1),0)] = @show pf * inner(dag(L_t),R)
+            C[get(indx,(i,i+Ny),0),get(indx,(j,j+1),0)] = pf * inner(dag(L_t),R)
             L = L * apply(op("F", s[j]), psi[j]) * psi_dag[j] #add JW term to account for space between o1 and o3
         end
     end
@@ -136,14 +136,14 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
         op_psi_i1 = apply(op(o2,s[i+Ny]), apply(op(j_2,s[i+Ny]),psi[i+Ny])) #second site (always H bond)
 
         L = (i>1 ? delta(dag(l[i-1])',l[i-1]) : 1.) * op_psi_i * psi_dag[i] #left system
-        println("(o1,o2):($i,$(i+Ny))")
+        #println("(o1,o2):($i,$(i+Ny))")
 
         for j in (i+1):(i+Ny-1)
             if j%Ny==1 && i%Ny!=0
                 L_t = copy(L)
                 op_psi_j = apply(op(j_3, s[j]),apply(op(o3,s[j]), psi[j]))
                 L_t = L_t * op_psi_j * psi_dag[j] 
-                println("(o3,o4):($j,$(j+Ny-1))")
+                #println("(o3,o4):($j,$(j+Ny-1))")
     
                 op_psi_j1 = apply(op(j_4, s[j+Ny-1]),apply(op(o4,s[j+Ny-1]), psi[j+Ny-1]))
                 R = (j+Ny-1 < (length(psi)) ? delta(dag(l[j+Ny-1]),l[j+Ny-1]') : 1.) * op_psi_j1 * psi_dag[j+Ny-1] #apply rightmost operator (second bond)
@@ -156,7 +156,7 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
                     L_t = L_t * psi_dag[k] * apply(op("F", s[k]), psi[k]) #should add JW? YES
                 end            
     
-                C[get(indx,(i,i+Ny),0),get(indx,(j,j+Ny-1),0)] = @show pf*inner(dag(L_t),R)
+                C[get(indx,(i,i+Ny),0),get(indx,(j,j+Ny-1),0)] = pf*inner(dag(L_t),R)
         
             end
             
@@ -164,7 +164,7 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
             L_t = copy(L)
             op_psi_j = apply(op(j_3, s[j]),apply(op(o3,s[j]), psi[j]))
             L_t = L_t * op_psi_j * psi_dag[j]
-            println("(o3,o4):($j,$(j+Ny))")
+            #println("(o3,o4):($j,$(j+Ny))")
 
             op_psi_j1 = apply(op(j_4, s[j+Ny]),apply(op(o4,s[j+Ny]), psi[j+Ny]))
             R = (j+Ny < (length(psi)) ? delta(dag(l[j+Ny]),l[j+Ny]') : 1.) * op_psi_j1 * psi_dag[j+Ny] #apply rightmost operator (second bond)
@@ -177,7 +177,7 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
                 L_t = L_t * psi_dag[k] * apply(op("F", s[k]), psi[k]) #should add JW? YES
             end            
 
-            C[get(indx,(i,i+Ny),0),get(indx,(j,j+Ny),0)] = @show pf*inner(dag(L_t),R)
+            C[get(indx,(i,i+Ny),0),get(indx,(j,j+Ny),0)] = pf*inner(dag(L_t),R)
 
             L = L * apply(op("F", s[j]), psi[j]) * psi_dag[j] #should add JW?
         end
@@ -203,22 +203,22 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
 
         op_psi_i = apply(op(o1, s[i]), apply(op(j_1,s[i]),psi[i])) #why apply instead of multiplication?
         L = (i>1 ? delta(dag(l[i-1])',l[i-1]) : 1.) * op_psi_i * psi_dag[i] #apply leftmost operator not sure 
-        println("(o1,o2):($i,$(i+Ny-1))")
+        #println("(o1,o2):($i,$(i+Ny-1))")
 
         op_psi_i1 = apply(op(o2, s[i+Ny-1]), apply(op(j_2,s[i+Ny-1]),psi[i+Ny-1])) #second site (always H bond
         R = (i+Ny-1 < (length(psi)) ? delta(dag(l[i+Ny-1]),l[i+Ny-1]') : 1.) * op_psi_i1 * psi_dag[i+Ny-1] #apply rightmost operator
 
         for j in (i+1):(i+Ny-3) #choose third site, convoluted way to only get the bonds in the middle
-            println("(o3,o4):($j,$(j+1))")
+            #println("(o3,o4):($j,$(j+1))")
             L_t = copy(L)
             op_psi_j = apply(op(j_3, s[j]), apply(op(o3,s[j]),psi[j]))
             op_psi_j1 = apply(op(j_4, s[j+1]), apply(op(o4,s[j+1]),psi[j+1]))
-            L_t = L_t * op_psi_j1 * psi_dag[j+1] * op_psi_j * psi_dag[j]
+            L_t = L_t * op_psi_j * psi_dag[j] * op_psi_j1 * psi_dag[j+1]
             for k in (j+2):(i+Ny-2) #add empty sites between the second bond and R
-                L_t = L_t * psi_dag[k] * psi[k] #should add JW?
+                L_t = L_t * psi_dag[k] * apply(op("F", s[k]), psi[k]) #should add JW?
             end
-            C[get(indx,(i,i+Ny-1),0),get(indx,(j,j+1),0)] = @show inner(dag(L_t),R)
-            L = L * psi[j] * psi_dag[j] #should add JW?
+            C[get(indx,(i,i+Ny-1),0),get(indx,(j,j+1),0)] = pf*inner(dag(L_t),R)
+            L = L * apply(op("F", s[j]), psi[j]) * psi_dag[j] #should add JW?
         end
     end
     
@@ -244,13 +244,13 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
         L = (i>1 ? delta(dag(l[i-1])',l[i-1]) : 1.) * op_psi_i * psi_dag[i]#apply leftmost operator not sure 
 
         op_psi_i1 = apply(op(o2, s[i+Ny-1]), apply(op(j_2,s[i+Ny-1]),psi[i+Ny-1])) #second site (always V bond)
-        println("(o1,o2):($i,$(i+Ny-1))")
+        #println("(o1,o2):($i,$(i+Ny-1))")
 
         for j in (i+1):(i+Ny-2)
             L_t = copy(L)
             op_psi_j = apply(op(j_3, s[j]), apply(op(o3,s[j]),psi[j]))
             L_t = L_t * op_psi_j * psi_dag[j] 
-            println("(o3,o4):($j,$(j+Ny))")
+            #println("(o3,o4):($j,$(j+Ny))")
 
             op_psi_j1 = apply(op(j_4, s[j+Ny]), apply(op(o4,s[j+Ny]),psi[j+Ny]))
             R = (j+Ny < (length(psi)) ? delta(dag(l[j+Ny]),l[j+Ny]') : 1.) * op_psi_j1 * psi_dag[j+Ny] #apply rightmost operator (second bond)
@@ -263,7 +263,7 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
                 L_t = L_t * psi_dag[k] * apply(op("F", s[k]), psi[k]) #should add JW? Yes
             end            
 
-            C[get(indx,(i,i+Ny-1),0),get(indx,(j,j+Ny),0)] = @show pf*inner(dag(L_t),R)
+            C[get(indx,(i,i+Ny-1),0),get(indx,(j,j+Ny),0)] = pf*inner(dag(L_t),R)
             L = L * apply(op("F", s[j]), psi[j]) * psi_dag[j] #should add JW?
         end
     end
@@ -303,13 +303,13 @@ function SC_rho(psi, Nx, Ny)
     return C
 end
 
-Nx=2; Ny=3; o1 = "Adagdn"; o2 = "Adagup"; o3 = "Aup"; o4 = "Adn"
+Nx=6; Ny=4; o1 = "Adagdn"; o2 = "Adagup"; o3 = "Aup"; o4 = "Adn"
 @time C_1=correlation_matrix_bond(psi, Nx, Ny, o1, o2, o3, o4)
 #VSCodeServer.@profview correlation_matrix_bond(psi, Nx, Ny, o1, o2, o3, o4)
 @time C_2=(SC_rho(psi, Nx, Ny))'
 a=2 .* C_2[findall(>=(1e-12),abs.(C_2))]
 b=C_1[findall(>=(1e-12),abs.(C_1))]
-@show findall(>=(1e-5), abs.(a .-b))
+@show findall(>=(1e-8), abs.(a .-b))
 
 function main()
     t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; doping = 1/16; maxlinkdim = 800
