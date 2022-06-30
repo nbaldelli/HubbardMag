@@ -141,7 +141,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; α=0, doping = 1/16, sparse_multithr
     end
 
     N = Nx * Ny
-    #Nϕ = yperiodic ? α*(Nx-1)*(Ny) : α*(Nx-1)*(Ny-1) #number of fluxes threading the system
+    Nϕ = yperiodic ? α*(Nx-1)*(Ny) : α*(Nx-1)*(Ny-1) #number of fluxes threading the system
 
     sites = siteinds("Electron", N, conserve_qns = true) #number of fermions is conserved, magnetization is NOT conserved
     lattice = square_lattice_nn(Nx, Ny; yperiodic = true)
@@ -167,16 +167,16 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; α=0, doping = 1/16, sparse_multithr
     ampo = OpSum()  
     for bond in lattice
         if bond.type == "1"
-            ampo += -t, "Cdagup", bond.s1, "Cup", bond.s2 #nearest-neighbour hopping
-            ampo += -t, "Cdagdn", bond.s1, "Cdn", bond.s2
-            ampo += -t, "Cdagup", bond.s2, "Cup", bond.s1
-            ampo += -t, "Cdagdn", bond.s2, "Cdn", bond.s1
+            ampo += -t*exp(1im*2pi*α*bond.x1*(bond.y2-bond.y1)), "Cdagup", bond.s1, "Cup", bond.s2 #nearest-neighbour hopping
+            ampo += -t*exp(1im*2pi*α*bond.x1*(bond.y2-bond.y1)), "Cdagdn", bond.s1, "Cdn", bond.s2
+            ampo += -t*exp(-1im*2pi*α*bond.x1*(bond.y2-bond.y1)), "Cdagup", bond.s2, "Cup", bond.s1
+            ampo += -t*exp(-1im*2pi*α*bond.x1*(bond.y2-bond.y1)), "Cdagdn", bond.s2, "Cdn", bond.s1
         end
         if bond.type == "2"
-            ampo += -tp, "Cdagup", bond.s1, "Cup", bond.s2 #next-nearest-neighbour hopping
-            ampo += -tp, "Cdagdn", bond.s1, "Cdn", bond.s2
-            ampo += -tp, "Cdagup", bond.s2, "Cup", bond.s1
-            ampo += -tp, "Cdagdn", bond.s2, "Cdn", bond.s1
+            ampo += -tp*exp(1im*2pi*α*(bond.x1+0.5)), "Cdagup", bond.s1, "Cup", bond.s2 #next-nearest-neighbour hopping
+            ampo += -tp*exp(1im*2pi*α*(bond.x1+0.5)), "Cdagdn", bond.s1, "Cdn", bond.s2
+            ampo += -tp*exp(-1im*2pi*α*(bond.x1+0.5)), "Cdagup", bond.s2, "Cup", bond.s1
+            ampo += -tp*exp(-1im*2pi*α*(bond.x1+0.5)), "Cdagdn", bond.s2, "Cdn", bond.s1
         end
     end
     for n in 1:N
@@ -198,17 +198,17 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; α=0, doping = 1/16, sparse_multithr
 end
 
 function main()
-    t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; doping = 1/16; max_linkdim = 200
-    Nx = 2; Ny = 3
+    t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; α=1/60; doping = 1/16; max_linkdim = 800
+    Nx = 4; Ny = 4
     println("DMRG run: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim)")
     #psi = dmrg_run_tj(Nx, Ny, t, tp, J, doping = doping, yperiodic = true, maxlinkdim = maxlinkdim)
-    psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, doping = doping, yperiodic = true, max_linkdim = max_linkdim)
+    psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, α=α, doping = doping, yperiodic = true, max_linkdim = max_linkdim)
 
     h5open("MPS.h5","cw") do f
-        if haskey(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim)")
-            delete_object(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim)")
+        if haskey(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)")
+            delete_object(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)")
         end
-        write(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim)",psi)
+        write(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)",psi)
     end
 end
 
