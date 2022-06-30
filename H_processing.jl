@@ -208,7 +208,7 @@ end
 
 let 
     Cd = SC+SC'
-    vals, vecs = eigen(Cd)
+    vals, vecs = eigen(C)
 
     plt.scatter(1:length(vals), reverse(vals))
     plt.title("Nx=$Nx, Ny=$Ny, maxlinkdim=$maxlinkdim")
