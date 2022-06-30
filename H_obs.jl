@@ -5,7 +5,7 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
     N=Nx*Ny
     lat = square_lattice(Nx, Ny, yperiodic = true)
     indx = Dict([(b.s1,b.s2)=>i for (i,b) in enumerate(lat)])
-    C = zeros(length(lat), length(lat))
+    C = zeros(ComplexF64, length(lat), length(lat))
 
     #easy term: second bond after the first (bulk of computation), both bonds either H or V
     println("Easy term")
@@ -273,14 +273,13 @@ end
 
 function SC_rho_opt(psi, Nx, Ny)
     lat = square_lattice(Nx, Ny, yperiodic = true)
-    A = zeros(length(lat), length(lat))
+    A = zeros(ComplexF64, length(lat), length(lat))
     A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Adn", "Aup")
     A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Aup", "Adn")
     A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Aup", "Adn") #here I put a plus instead of a minus and it works!
     A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Adn", "Aup")
-    return 1/2 .*(A)
+    return 1/2 .*(A+A')
 end
-
 
 function SC_rho(psi, Nx, Ny)
 
@@ -290,7 +289,7 @@ function SC_rho(psi, Nx, Ny)
 
     sites = siteinds(psi)  
     lat = square_lattice(Nx, Ny, yperiodic = true) #generate all bonds   
-    C = zeros(length(lat), length(lat))
+    C = zeros(ComplexF64, length(lat), length(lat))
     println(length(lat)^2)
     for i in 1:length(lat) #multithreading on 16 threads
         b1 = lat[i]
@@ -314,32 +313,23 @@ function SC_rho(psi, Nx, Ny)
     return C
 end
 
-#Nx=3; Ny=3; #o1 = "Adagdn"; o2 = "Adagup"; o3 = "Aup"; o4 = "Adn"
-#@time C_1=correlation_matrix_bond(psi, Nx, Ny, o1, o2, o3, o4)
-#VSCodeServer.@profview correlation_matrix_bond(psi, Nx, Ny, o1, o2, o3, o4)
-@time C_1=(SC_rho_opt(psi, Nx, Ny))
-@time C_2=(SC_rho(psi, Nx, Ny))'
-a=C_2[findall(>=(1e-12),abs.(C_2))]
-b=C_1[findall(>=(1e-12),abs.(C_1))]
-@show findall(>=(1e-8), abs.(a .-b))
-
 function main()
     t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; doping = 1/16; maxlinkdim = 800
     Nx = 4; Ny = 2
     println("Observable calculation: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_mlink($max_linkdim)")
     f = h5open("MPS.h5", "r")
-    psi = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim)", MPS)
+    psi = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)", MPS)
     close(f)
 
-    C = @time SC_rho(psi, Nx, Ny) #longest process!
+    C = @time SC_rho_opt(psi, Nx, Ny) #longest process!
     Cd = correlation_matrix(psi, "Cdagup", "Cup") + correlation_matrix(psi, "Cdagdn", "Cdn") 
     h5open("corr.h5","cw") do f
-        if haskey(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim)")
-            delete_object(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim)")
-            delete_object(f, "dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim)")
+        if haskey(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)")
+            delete_object(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)")
+            delete_object(f, "dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)")
         end
-        write(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim)",C)
-        write(f,"dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim)",Cd)
+        write(f,"SC_H_tp($tp)_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)",C)
+        write(f,"dens_H_tp($tp)_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)",Cd)
     end
 end
 
@@ -364,6 +354,8 @@ plt.scatter([8,12,16,20,24,28],[1.16,5.771,35.36,67.39,162.81,259.12], label="MP
 plt.plot([8,12,16,20,24,28],4 .*[0.64,1.74,3.25,5.84,8.59,13.24])
 plt.scatter([8,12,16,20,24,28],4 .*[0.64,1.74,3.25,5.84,8.59,13.24], label="OPT")
 plt.xlabel("sites")
+plt.xlim([7,29])
 plt.ylabel("time")
+plt.grid(true)
 plt.legend()
 =#
