@@ -314,22 +314,22 @@ function SC_rho(psi, Nx, Ny)
 end
 
 function main()
-    t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; doping = 1/16; maxlinkdim = 800
-    Nx = 4; Ny = 2
+    t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; α=1/60; doping = 1/16; max_linkdim = 800
+    Nx = 4; Ny = 4
     println("Observable calculation: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_mlink($max_linkdim)")
     f = h5open("MPS.h5", "r")
-    psi = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)", MPS)
+    psi = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)", MPS)
     close(f)
 
     C = @time SC_rho_opt(psi, Nx, Ny) #longest process!
     Cd = correlation_matrix(psi, "Cdagup", "Cup") + correlation_matrix(psi, "Cdagdn", "Cdn") 
     h5open("corr.h5","cw") do f
-        if haskey(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)")
-            delete_object(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)")
-            delete_object(f, "dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)")
+        if haskey(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
+            delete_object(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
+            delete_object(f, "dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
         end
-        write(f,"SC_H_tp($tp)_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)",C)
-        write(f,"dens_H_tp($tp)_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)",Cd)
+        write(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)",C)
+        write(f,"dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)",Cd)
     end
 end
 
