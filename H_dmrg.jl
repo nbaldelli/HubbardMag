@@ -128,7 +128,7 @@ function dmrg_run_tj(Nx, Ny, t, tp, J; doping = 1/16, sparse_multithreading = tr
     return psi
 end
 
-function dmrg_run_hubbard(Nx, Ny, t, tp, U; α=0, doping = 1/16, sparse_multithreading = true, yperiodic = true, max_linkdim = 100)
+function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, sparse_multithreading = true, yperiodic = true, max_linkdim = 100)
     
     if sparse_multithreading
         ITensors.Strided.set_num_threads(1)
@@ -143,8 +143,23 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; α=0, doping = 1/16, sparse_multithr
     N = Nx * Ny
     Nϕ = yperiodic ? α*(Nx-1)*(Ny) : α*(Nx-1)*(Ny-1) #number of fluxes threading the system
 
-    sites = siteinds("Electron", N, conserve_qns = true) #number of fermions is conserved, magnetization is NOT conserved
     lattice = square_lattice_nn(Nx, Ny; yperiodic = true)
+
+    holes = floor(Int,N*doping)
+    num_f = N - holes
+
+    if psi0 === nothing
+        sites = siteinds("Electron", N, conserve_qns = true) #number of fermions is conserved, magnetization is NOT conserved
+        in_state = ["Up" for _ in 1:(floor(num_f/2)-1)]
+        append!(in_state, ["Dn" for _ in 1:(num_f - floor(num_f/2)) -1])
+        append!(in_state, ["UpDn"])
+        append!(in_state, ["0" for _ in 1:(holes+1) ])
+        shuffle!(in_state) #DANGER: changes at every run
+
+        psi0 = randomMPS(sites, in_state, linkdims=10)
+    end
+
+    sites = siteinds(psi0)
 
     #=set up of DMRG schedule=#
     sweeps = Sweeps(20)
@@ -152,18 +167,8 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; α=0, doping = 1/16, sparse_multithr
     setcutoff!(sweeps, 1e-9)
     setnoise!(sweeps, 1e-8, 1e-10, 0) #how much??
     en_obs = DMRGObserver(energy_tol = 1e-7)
-
-    holes = floor(Int,N*doping)
-    num_f = N - holes
-    in_state = ["Up" for _ in 1:(floor(num_f/2)-1)]
-    append!(in_state, ["Dn" for _ in 1:(num_f - floor(num_f/2)) -1])
-    append!(in_state, ["UpDn"])
-    append!(in_state, ["0" for _ in 1:(holes+1) ])
-    shuffle!(in_state) #DANGER: changes at every run
-
-    psi0 = randomMPS(sites, in_state, linkdims=10)
-
-    #= hamiltonian definition tj=#
+    
+    #= hamiltonian definition hubbard=#
     ampo = OpSum()  
     for bond in lattice
         if bond.type == "1"
@@ -198,17 +203,23 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; α=0, doping = 1/16, sparse_multithr
 end
 
 function main()
-    t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; α=1/60; doping = 1/16; max_linkdim = 800
-    Nx = 4; Ny = 4
-    println("DMRG run: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim)")
+    Nx = 8; Ny = 4; t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; α=1/60; doping = 1/16; 
+    max_linkdim = 800; reupload = true; psi0 = nothing
+    if reupload;
+        f = h5open("data/MPS.h5","r")
+        psi0 = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)",MPS)
+        close(f)
+    end
+    println(psi0)
+    println("DMRG run: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_mlink($max_linkdim)")
     #psi = dmrg_run_tj(Nx, Ny, t, tp, J, doping = doping, yperiodic = true, maxlinkdim = maxlinkdim)
-    psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, α=α, doping = doping, yperiodic = true, max_linkdim = max_linkdim)
+    psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, psi0=psi0, α=α, doping = doping, yperiodic = true, max_linkdim = max_linkdim)
 
     h5open("MPS.h5","cw") do f
-        if haskey(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)")
-            delete_object(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)")
+        if haskey(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
+            delete_object(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
         end
-        write(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($maxlinkdim)",psi)
+        write(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)",psi)
     end
 end
 
