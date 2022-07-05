@@ -178,16 +178,18 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
             ampo += -t*exp(-1im*2pi*α*bond.x1*(bond.y2-bond.y1)), "Cdagdn", bond.s2, "Cdn", bond.s1
         end
         if bond.type == "2"
-            ampo += -tp*exp(1im*2pi*α*(bond.x1+0.5)), "Cdagup", bond.s1, "Cup", bond.s2 #next-nearest-neighbour hopping
-            ampo += -tp*exp(1im*2pi*α*(bond.x1+0.5)), "Cdagdn", bond.s1, "Cdn", bond.s2
-            ampo += -tp*exp(-1im*2pi*α*(bond.x1+0.5)), "Cdagup", bond.s2, "Cup", bond.s1
-            ampo += -tp*exp(-1im*2pi*α*(bond.x1+0.5)), "Cdagdn", bond.s2, "Cdn", bond.s1
+            pf = bond.y2-bond.y1
+            if abs(pf)>1.1; pf = -sign(pf) end
+            ampo += -tp*exp(1im*2pi*α*(bond.x1+0.5)*pf), "Cdagup", bond.s1, "Cup", bond.s2 #next-nearest-neighbour hopping
+            ampo += -tp*exp(1im*2pi*α*(bond.x1+0.5)*pf), "Cdagdn", bond.s1, "Cdn", bond.s2
+            ampo += -tp*exp(-1im*2pi*α*(bond.x1+0.5)*pf), "Cdagup", bond.s2, "Cup", bond.s1
+            ampo += -tp*exp(-1im*2pi*α*(bond.x1+0.5)*pf), "Cdagdn", bond.s2, "Cdn", bond.s1
         end
     end
     for n in 1:N
         ampo += U, "Nup", n, "Ndn", n #density-density interaction
     end
-
+    
     H = MPO(ampo, sites)
 
     if sparse_multithreading
@@ -210,7 +212,6 @@ function main()
         psi0 = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)",MPS)
         close(f)
     end
-    println(psi0)
     println("DMRG run: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_mlink($max_linkdim)")
     #psi = dmrg_run_tj(Nx, Ny, t, tp, J, doping = doping, yperiodic = true, maxlinkdim = maxlinkdim)
     psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, psi0=psi0, α=α, doping = doping, yperiodic = true, max_linkdim = max_linkdim)
