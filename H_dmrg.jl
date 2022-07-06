@@ -163,7 +163,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
 
     #=set up of DMRG schedule=#
     sweeps = Sweeps(20)
-    setmaxdim!(sweeps, max_linkdim)
+    setmaxdim!(sweeps, 100, 200, 300, 400, max_linkdim)
     setcutoff!(sweeps, 1e-9)
     setnoise!(sweeps, 1e-8, 1e-10, 0) #how much??
     en_obs = DMRGObserver(energy_tol = 1e-7)
@@ -205,18 +205,18 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
 end
 
 function main()
-    Nx = 8; Ny = 4; t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; α=1/60; doping = 1/16; 
-    max_linkdim = 800; reupload = true; psi0 = nothing
+    Nx = 4; Ny = 4; t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; α=1/100; doping = 1/16; 
+    max_linkdim = 500; reupload = true; prev_alpha = 0; psi0 = nothing 
     if reupload;
         f = h5open("data/MPS.h5","r")
-        psi0 = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)",MPS)
+        psi0 = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($prev_alpha)_mlink($max_linkdim)",MPS)
         close(f)
     end
     println("DMRG run: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_mlink($max_linkdim)")
     #psi = dmrg_run_tj(Nx, Ny, t, tp, J, doping = doping, yperiodic = true, maxlinkdim = maxlinkdim)
     psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, psi0=psi0, α=α, doping = doping, yperiodic = true, max_linkdim = max_linkdim)
 
-    h5open("MPS.h5","cw") do f
+    h5open("data/MPS.h5","cw") do f
         if haskey(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
             delete_object(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
         end
