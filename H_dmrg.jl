@@ -21,7 +21,7 @@ function square_lattice_nn(Nx::Int, Ny::Int; kwargs...)::Lattice
           latt[b += 1] = LatticeBond(n, n + 1, x, y, x, y + 1, "1")
         end
         if yperiodic && y == 1
-          latt[b += 1] = LatticeBond(n, n + Ny - 1, x, y, x, y + Ny, "1")
+          latt[b += 1] = LatticeBond(n, n + Ny - 1, x, y, x, y + Ny - 1, "1")
         end
       end
 
@@ -143,7 +143,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
     N = Nx * Ny
     Nϕ = yperiodic ? α*(Nx-1)*(Ny) : α*(Nx-1)*(Ny-1) #number of fluxes threading the system
 
-    lattice = square_lattice_nn(Nx, Ny; yperiodic = true)
+    lattice = square_lattice_nn(Nx, Ny; yperiodic = yperiodic)
 
     holes = floor(Int,N*doping)
     num_f = N - holes
@@ -155,6 +155,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
         append!(in_state, ["UpDn"])
         append!(in_state, ["0" for _ in 1:(holes+1) ])
         shuffle!(in_state) #DANGER: changes at every run
+        println(in_state)
 
         psi0 = randomMPS(sites, in_state, linkdims=10)
     end
@@ -162,7 +163,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
     sites = siteinds(psi0)
 
     #=set up of DMRG schedule=#
-    sweeps = Sweeps(20)
+    sweeps = Sweeps(30)
     setmaxdim!(sweeps, 100, 200, 300, 400, max_linkdim)
     setcutoff!(sweeps, 1e-9)
     setnoise!(sweeps, 1e-8, 1e-10, 0) #how much??
@@ -178,6 +179,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
             ampo += -t*exp(-1im*2pi*α*bond.x1*(bond.y2-bond.y1)), "Cdagdn", bond.s2, "Cdn", bond.s1
         end
         if bond.type == "2"
+            
             pf = bond.y2-bond.y1
             if abs(pf)>1.1; pf = -sign(pf) end
             ampo += -tp*exp(1im*2pi*α*(bond.x1+0.5)*pf), "Cdagup", bond.s1, "Cup", bond.s2 #next-nearest-neighbour hopping
@@ -189,7 +191,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
     for n in 1:N
         ampo += U, "Nup", n, "Ndn", n #density-density interaction
     end
-    
+
     H = MPO(ampo, sites)
 
     if sparse_multithreading
@@ -205,16 +207,16 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
 end
 
 function main()
-    Nx = 4; Ny = 4; t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; α=1/100; doping = 1/16; 
-    max_linkdim = 500; reupload = true; prev_alpha = 0; psi0 = nothing 
+    Nx = 5; Ny = 4; t = 1; tp = 0.0; J = 0.4; U=(4*t^2)/J; α=1/60; doping = 1/16; 
+    max_linkdim = 500; reupload = false; prev_alpha = 0; psi0 = nothing 
     if reupload;
         f = h5open("data/MPS.h5","r")
         psi0 = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($prev_alpha)_mlink($max_linkdim)",MPS)
         close(f)
     end
-    println("DMRG run: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_mlink($max_linkdim)")
+    println("DMRG run: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
     #psi = dmrg_run_tj(Nx, Ny, t, tp, J, doping = doping, yperiodic = true, maxlinkdim = maxlinkdim)
-    psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, psi0=psi0, α=α, doping = doping, yperiodic = true, max_linkdim = max_linkdim)
+    psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, psi0=psi0, α=α, doping = doping, yperiodic = false, max_linkdim = max_linkdim)
 
     h5open("data/MPS.h5","cw") do f
         if haskey(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
