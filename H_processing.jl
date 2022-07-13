@@ -63,28 +63,27 @@ function currents_from_correlation_V3(t, tp, lattice::Vector{LatticeBond}, C, α
 end
 
 let
-    t = 1; tp = 0.0; J = 0.4; U=(4*t^2)/J; α=1/60; U=0; doping = 1/16; max_linkdim = 500
-    Nx = 5; Ny = 4
+    t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; α=1.0/60; doping = 1/16; max_linkdim = 1200
+    Nx = 8; Ny = 4
 
-    h5open("data/corr.h5","r") do f
+    h5open("corr.h5","r") do f
+        @show keys(f)
         SC = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
-        #corr_dens = read(f,"densup_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($max_linkdim)") + read(f,"densdn_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($max_linkdim)")
-        corr_dens_up = read(f,"dens_up_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
-        corr_dens_dn = read(f,"dens_dn_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
+        corr_dens = read(f,"dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
 
-        dens = real(diag(corr_dens_up)+diag(corr_dens_dn))
-        println(sum(dens))
+        dens = real(diag(corr_dens))
+
         mean_dens = zeros(Nx)
         for i in 1:Nx
             mean_dens[i] = 1-sum(dens[(1+(i-1)*Ny):(i*Ny)])/Ny
         end
-        #=
+        
         plt.figure(1)
         plt.plot(1:Nx,mean_dens)
         plt.scatter(1:Nx,mean_dens, label="$α")
         plt.title("Nx=$Nx, Ny=$Ny, α=$α, maxlinkdim=$max_linkdim")
         plt.grid(true); plt.xlabel("x"); plt.ylabel("Mean hole density")
-        plt.legend()
+        plt.legend(title="α")
 
         #plt.savefig("dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_mlink($maxlinkdim).pdf")
         
@@ -108,7 +107,8 @@ let
         end
 
         #= plot of current and density =#
-        num = length(lat); neig = length(lat)-num+1
+        num = length(lat); #choose which eigenvector
+        neig = length(lat)-num+1
         eig_v = real(vecs[:,num])
 
         av_pair = zeros(ComplexF64,Nx);
@@ -118,9 +118,10 @@ let
 
         plt.figure(3)
         plt.plot(1:Nx,abs.(av_pair))
-        plt.scatter(1:Nx,abs.(av_pair))
-        plt.title("Nx=$Nx, Ny=$Ny, α=$α, maxlinkdim=$max_linkdim")
+        plt.scatter(1:Nx,abs.(av_pair), label="$α")
+        plt.title("Nx=$Nx, Ny=$Ny maxlinkdim=$max_linkdim")
         plt.grid(true); plt.xlabel("x"); plt.ylabel("Mean pairing")
+        plt.legend(title="α")
 
         fig, ax = plt.subplots(1, dpi = 150)
         ax.set_ylim(0.5,Ny+0.5)
@@ -134,8 +135,11 @@ let
         plt.colorbar(pl_dens, ax=ax, location="bottom", label=" hole density", shrink=0.7, pad=0.03, aspect=50)
         plt.colorbar(pl_curr, ax=ax, location="bottom", label="pairing", shrink=0.7, pad=0.07, aspect=50)
         plt.tight_layout()
+        display(fig)
+        plt.close()    
+
         #plt.savefig("fulldens_H_($Nx)_($neig).pdf")
-        =#
+        
         lat=square_lattice(Nx,Ny,yperiodic=false)
         couples, curr_plot_up = currents_from_correlation_V3(t, tp, lat, corr_dens_up, α) #current
         couples, curr_plot_dn = currents_from_correlation_V3(t, tp, lat, corr_dens_up, α) #current
@@ -153,20 +157,10 @@ let
         plt.gca().set_aspect("equal")
         plt.colorbar(pl_dens, ax=ax, location="bottom", label="density", shrink=0.7, pad=0.03, aspect=50)
         plt.colorbar(pl_curr, ax=ax, location="bottom", label="current", shrink=0.7, pad=0.07, aspect=50)
-        plt.title("Parameters: α=$α, Nx=$Nx, Ny=$Ny U=$U")
+        plt.title("Parameters: α=1/6, Nx=$Nx, Ny=$Ny, U=$U, BD=$max_linkdim")
         plt.tight_layout()
         display(fig)
         plt.close()    
         #plt.savefig("fulldens_H_($Nx)_($neig).pdf")
     end
-end
-
-av_pair = zeros(Nx); num = length(lat)-4
-for (i, b) in enumerate(lat)
-    av_pair[Int(b.x1)] += (-1)^(b.x2-b.x1)*vecs[i,num]
-end
-plt.plot(av_pair)
-
-for b in lat 
-    println(b.x2-b.x1)
 end

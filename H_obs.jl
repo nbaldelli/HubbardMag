@@ -313,16 +313,32 @@ function SC_rho(psi, Nx, Ny)
     return C
 end
 
+function entanglement_entropy(psi,b)
+    orthogonalize!(psi, b)
+    U,S,V = svd(psi[b], (linkind(psi, b-1), siteind(psi,b)))
+    p=0.0
+    SvN = 0.0
+    for n=1:dim(S, 1)
+        p = S[n,n]^2
+        SvN -= p * log(p)
+    end
+    return SvN
+end
+
 function main()
-    t = 1; tp = 0.2; J = 0.4; U=(4*t^2)/J; α=1/60; doping = 1/16; max_linkdim = 800
-    Nx = 4; Ny = 4
-    println("Observable calculation: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_mlink($max_linkdim)")
+    t = 1; tp = 0.0; J = 0.4; U=(4*t^2)/J; α=1/100; doping = 1/16; max_linkdim = 1000
+    Nx = 16; Ny = 4
+
+    println("Observable calculation: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
     f = h5open("MPS.h5", "r")
     psi = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)", MPS)
     close(f)
 
+    EE = @show entanglement_entropy(psi,Int(length(psi)/2))
+
     C = @time SC_rho_opt(psi, Nx, Ny) #longest process!
-    Cd = correlation_matrix(psi, "Cdagup", "Cup") + correlation_matrix(psi, "Cdagdn", "Cdn") 
+    Cd = correlation_matrix(psi, "Cdagup", "Cup") + correlation_matrix(psi, "Cdagdn", "Cdn")
+    
     h5open("corr.h5","cw") do f
         if haskey(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
             delete_object(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
@@ -358,4 +374,22 @@ plt.xlim([7,29])
 plt.ylabel("time")
 plt.grid(true)
 plt.legend()
+
+fig, ax = plt.subplots(2,1,dpi=100,figsize=(4,6))
+
+ax[1].set_title("Scaling with bond dimension, 8x4, α=1/100")
+ax[1].plot([600,800,1000,1200,1400],[-16.25923,-16.287964,-16.302642,-16.311563,-16.31746])
+ax[1].scatter([600,800,1000,1200,1400],[-16.25923,-16.287964,-16.302642,-16.311563,-16.31746], label="GS en.")
+ax[2].plot([600,800,1000,1200,1400],[1.87e-4,1.27e-4,9.22e-5,7.07e-5,5.49e-5])
+ax[2].scatter([600,800,1000,1200,1400],[1.87e-4,1.27e-4,9.22e-5,7.07e-5,5.49e-5], label = "tr. err.")
+ax[1].scatter([1400],[-16.317429])
+ax[2].set_xlabel("Bond dimension")
+ax[1].set_ylabel("GS Energy")
+ax[2].set_ylabel("trunc. err.")
+
+ax[1].grid(true)
+ax[2].grid(true)
+plt.tight_layout()
+
+
 =#
