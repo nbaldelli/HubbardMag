@@ -59,7 +59,7 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
 
                     R = ((j+O)<length(psi) ? delta(dag(l[j+O]),l[j+O]') : 1.) * op_psi_j1 * psi_dag[j+O] #create right system
                     for str in (O-1):-1:1 #insert JW string between o3 and o4
-                        R = R * psi_dag[j + str] * apply(op("F", s[j + str]), psi[j + str]) #ASK MATT HOW THE ORDER IN THIS MULTIPLICATION IMPACTS COMPUTATION TIME
+                        R = R * apply(op("F", s[j + str]), psi[j + str]) * psi_dag[j + str] #ASK MATT HOW THE ORDER IN THIS MULTIPLICATION IMPACTS COMPUTATION TIME
                     end        
                     R = R * op_psi_j * psi_dag[j] 
 
@@ -258,7 +258,7 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
             for k in (j+1):(i+Ny-2) #add empty sites between the third op. and the second
                 L_t = L_t * psi_dag[k] * psi[k]  #should add JW? NO
             end
-            L_t = op_psi_i1 * psi_dag[i+Ny-1] * L_t
+            L_t = L_t * op_psi_i1 * psi_dag[i+Ny-1]
             for k in (i+Ny):(j+Ny-1) #add empty sites between the second op. and the fourth
                 L_t = L_t * psi_dag[k] * apply(op("F", s[k]), psi[k]) #should add JW? Yes
             end            
@@ -326,11 +326,11 @@ function entanglement_entropy(psi,b)
 end
 
 function main()
-    t = 1; tp = 0.0; J = 0.4; U=(4*t^2)/J; α=1/100; doping = 1/16; max_linkdim = 1000
-    Nx = 16; Ny = 4
+    t = 1; tp = 0.0; J = 0.4; U=(4*t^2)/J; α=1/60; doping = 1/16; max_linkdim = 450
+    Nx = 5; Ny = 4
 
     println("Observable calculation: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
-    f = h5open("MPS.h5", "r")
+    f = h5open("data/MPS.h5", "r")
     psi = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)", MPS)
     close(f)
 
@@ -338,7 +338,7 @@ function main()
 
     C = @time SC_rho_opt(psi, Nx, Ny) #longest process!
     Cd = correlation_matrix(psi, "Cdagup", "Cup") + correlation_matrix(psi, "Cdagdn", "Cdn")
-    
+
     h5open("corr.h5","cw") do f
         if haskey(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
             delete_object(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
