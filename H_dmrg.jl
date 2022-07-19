@@ -1,4 +1,4 @@
-using LinearAlgebra, ITensors, ITensors.HDF5, MKL, Random
+using LinearAlgebra, ITensors, ITensors.HDF5, Random
 
 function square_lattice_nn(Nx::Int, Ny::Int; kwargs...)::Lattice
     yperiodic = get(kwargs, :yperiodic, false)
@@ -44,7 +44,7 @@ function square_lattice_nn(Nx::Int, Ny::Int; kwargs...)::Lattice
     return latt
 end
 
-function dmrg_run_tj(Nx, Ny, t, tp, J; doping = 1/16, sparse_multithreading = true, yperiodic = true, maxlinkdim = 100)
+function dmrg_run_tj(Nx, Ny, t, tp, J, lattice; doping = 1/16, sparse_multithreading = true, maxlinkdim = 100)
     
     if sparse_multithreading
         ITensors.Strided.set_num_threads(1)
@@ -60,7 +60,7 @@ function dmrg_run_tj(Nx, Ny, t, tp, J; doping = 1/16, sparse_multithreading = tr
     #Nϕ = yperiodic ? α*(Nx-1)*(Ny) : α*(Nx-1)*(Ny-1) #number of fluxes threading the system
 
     sites = siteinds("tJ", N, conserve_qns = true) #number of fermions is conserved, magnetization is NOT conserved
-    lattice = square_lattice_nn(Nx, Ny; yperiodic = true)
+    #lattice = square_lattice_nn(Nx, Ny; yperiodic = yperiodic)
 
     #=set up of DMRG schedule=#
     sweeps = Sweeps(20)
@@ -128,7 +128,7 @@ function dmrg_run_tj(Nx, Ny, t, tp, J; doping = 1/16, sparse_multithreading = tr
     return psi
 end
 
-function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, sparse_multithreading = true, yperiodic = true, max_linkdim = 100)
+function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping = 1/16, sparse_multithreading = true, max_linkdim = 100)
     
     if sparse_multithreading
         ITensors.Strided.set_num_threads(1)
@@ -141,15 +141,14 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
     end
 
     N = Nx * Ny
-    Nϕ = yperiodic ? α*(Nx-1)*(Ny) : α*(Nx-1)*(Ny-1) #number of fluxes threading the system
 
-    lattice = square_lattice_nn(Nx, Ny; yperiodic = yperiodic)
+    #lattice = square_lattice_nn(Nx, Ny; yperiodic = yperiodic)
 
     holes = floor(Int,N*doping)
     num_f = N - holes
 
     if psi0 === nothing
-        sites = siteinds("Electron", N, conserve_qns = true) #number of fermions is conserved, magnetization is NOT conserved
+        sites = siteinds("Electron", N, conserve_qns = true) #number of fermions is conserved, magnetization is zero
         in_state = ["Up" for _ in 1:(floor(num_f/2)-1)]
         append!(in_state, ["Dn" for _ in 1:(num_f - floor(num_f/2)) -1])
         append!(in_state, ["UpDn"])
@@ -164,28 +163,31 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
 
     #=set up of DMRG schedule=#
     sweeps = Sweeps(30)
-    setmaxdim!(sweeps, 100, 200, 300, 400, max_linkdim)
+    setmaxdim!(sweeps, max_linkdim)
     setcutoff!(sweeps, 1e-9)
-    setnoise!(sweeps, 1e-8, 1e-10, 0) #how much??
+    setnoise!(sweeps, 1e-8, 1e-10, 0)
     en_obs = DMRGObserver(energy_tol = 1e-7)
     
     #= hamiltonian definition hubbard=#
     ampo = OpSum()  
     for bond in lattice
         if bond.type == "1"
-            ampo += -t*exp(1im*2pi*α*bond.x1*(bond.y2-bond.y1)), "Cdagup", bond.s1, "Cup", bond.s2 #nearest-neighbour hopping
-            ampo += -t*exp(1im*2pi*α*bond.x1*(bond.y2-bond.y1)), "Cdagdn", bond.s1, "Cdn", bond.s2
-            ampo += -t*exp(-1im*2pi*α*bond.x1*(bond.y2-bond.y1)), "Cdagup", bond.s2, "Cup", bond.s1
-            ampo += -t*exp(-1im*2pi*α*bond.x1*(bond.y2-bond.y1)), "Cdagdn", bond.s2, "Cdn", bond.s1
+            pf = bond.y2 - bond.y1
+            if abs(pf) > 1.1; pf = -sign(pf) end
+            X = bond.x1 - (Nx-1)/2
+            ampo += -t*exp(1im*2pi*α*X*pf), "Cdagup", bond.s1, "Cup", bond.s2 #nearest-neighbour hopping
+            ampo += -t*exp(1im*2pi*α*X*pf), "Cdagdn", bond.s1, "Cdn", bond.s2
+            ampo += -t*exp(-1im*2pi*α*X*pf), "Cdagup", bond.s2, "Cup", bond.s1
+            ampo += -t*exp(-1im*2pi*α*X*pf), "Cdagdn", bond.s2, "Cdn", bond.s1
         end
         if bond.type == "2"
-            
             pf = bond.y2-bond.y1
             if abs(pf)>1.1; pf = -sign(pf) end
-            ampo += -tp*exp(1im*2pi*α*(bond.x1+0.5)*pf), "Cdagup", bond.s1, "Cup", bond.s2 #next-nearest-neighbour hopping
-            ampo += -tp*exp(1im*2pi*α*(bond.x1+0.5)*pf), "Cdagdn", bond.s1, "Cdn", bond.s2
-            ampo += -tp*exp(-1im*2pi*α*(bond.x1+0.5)*pf), "Cdagup", bond.s2, "Cup", bond.s1
-            ampo += -tp*exp(-1im*2pi*α*(bond.x1+0.5)*pf), "Cdagdn", bond.s2, "Cdn", bond.s1
+            X = bond.x1 - (Nx-1)/2
+            ampo += -tp*exp(1im*2pi*α*(X+0.5)*pf), "Cdagup", bond.s1, "Cup", bond.s2 #next-nearest-neighbour hopping
+            ampo += -tp*exp(1im*2pi*α*(X+0.5)*pf), "Cdagdn", bond.s1, "Cdn", bond.s2
+            ampo += -tp*exp(-1im*2pi*α*(X+0.5)*pf), "Cdagup", bond.s2, "Cup", bond.s1
+            ampo += -tp*exp(-1im*2pi*α*(X+0.5)*pf), "Cdagdn", bond.s2, "Cdn", bond.s1
         end
     end
     for n in 1:N
@@ -206,17 +208,21 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U; psi0=nothing, α=0, doping = 1/16, s
     return psi
 end
 
-function main()
-    Nx = 5; Ny = 4; t = 1; tp = 0.0; J = 0.4; U=(4*t^2)/J; α=1/60; doping = 1/16; 
-    max_linkdim = 500; reupload = false; prev_alpha = 0; psi0 = nothing 
+function main_dmrg(; Nx = 2, Ny = 2, t = 1, tp = 0.2, J = 0.4, U=10., α=1/60, doping = 1/16, 
+                    yperiodic = false,
+                    max_linkdim = 350, reupload = false, prev_alpha = 1/60, psi0 = nothing)
+
     if reupload;
         f = h5open("data/MPS.h5","r")
         psi0 = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($prev_alpha)_mlink($max_linkdim)",MPS)
         close(f)
     end
+
     println("DMRG run: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
-    #psi = dmrg_run_tj(Nx, Ny, t, tp, J, doping = doping, yperiodic = true, maxlinkdim = maxlinkdim)
-    psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, psi0=psi0, α=α, doping = doping, yperiodic = false, max_linkdim = max_linkdim)
+    
+    lattice = square_lattice_nn(Nx, Ny, yperiodic = yperiodic)
+    #psi = dmrg_run_tj(Nx, Ny, t, tp, J, doping = doping, maxlinkdim = maxlinkdim)
+    psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice, psi0=psi0, α=α, doping = doping, max_linkdim = max_linkdim)
 
     h5open("data/MPS.h5","cw") do f
         if haskey(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
@@ -226,5 +232,5 @@ function main()
     end
 end
 
-main()
+main_dmrg()
 

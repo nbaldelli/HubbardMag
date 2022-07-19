@@ -1,15 +1,12 @@
-using LinearAlgebra, ITensors, ITensors.HDF5, MKL, Random 
+using LinearAlgebra, ITensors, ITensors.HDF5, Random 
 
-function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
+function correlation_matrix_bond(psi0, Nx, Ny, lat, o1, o2, o3, o4)
 
     N=Nx*Ny
-    lat = square_lattice(Nx, Ny, yperiodic = true)
     indx = Dict([(b.s1,b.s2)=>i for (i,b) in enumerate(lat)])
     C = zeros(ComplexF64, length(lat), length(lat))
 
-    #easy term: second bond after the first (bulk of computation), both bonds either H or V
-    println("Easy term")
-    
+    #easy term: second bond after the first (bulk of computation), both bonds either H or V    
     #set F operators on sites where creation/destruction operators act (required for spinful fermions)
     if (o1 == "Adagup" && o3 == "Aup") j_1 = "F"; j_2 = "F"; j_3 = "F"; j_4 = "F"; pf = 1
     elseif (o1 == "Adagdn" && o3 == "Aup") j_1 = "Id"; j_2 = "Id"; j_3 = "F"; j_4 = "F"; pf = -1
@@ -71,8 +68,6 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
     end
     
     #annoying term 1: second bond in the middle: (o1,o3,o4,o2) (first bond always H, second always V)
-    println("Annoying term 1")
-
     psi = copy(psi0)
     orthogonalize!(psi,1)
     psi_dag = prime(linkinds, dag(psi))
@@ -114,8 +109,6 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
     end
     
     #annoying term 2: overlapping bonds (o1,o3,o2,o4) (first bond always H, second always H) DOESNT WORK
-    println("Annoying term 2")
-
     psi = copy(psi0)
     orthogonalize!(psi,1)
     psi_dag = prime(linkinds, dag(psi))
@@ -187,8 +180,6 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
     psi = copy(psi0)
     orthogonalize!(psi,1)
     psi_dag = prime(linkinds, dag(psi))
-
-    println("term ext1")
    
     if (o1 == "Adagup" && o3 == "Aup") j_1 = "F"; j_3 = "Id"; j_4 = "Id"; j_2 = "F"; pf = 1
     elseif (o1 == "Adagdn" && o3 == "Aup") j_1 = "Id"; j_3 = "Id"; j_4 = "Id"; j_2 = "Id"; pf = -1
@@ -226,8 +217,6 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
     psi = copy(psi0)
     orthogonalize!(psi,1)
     psi_dag = prime(linkinds, dag(psi))
-
-    println("term ext2")
 
     if (o1 == "Adagup" && o3 == "Aup") j_1 = "F"; j_3 = "Id"; j_2 = "Id"; j_4 = "F"; pf = 1
     elseif (o1 == "Adagdn" && o3 == "Aup") j_1 = "Id"; j_3 = "Id"; j_2 = "F"; j_4 = "F"; pf = -1
@@ -271,24 +260,27 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
     return C
 end
 
-function SC_rho_opt(psi, Nx, Ny)
-    lat = square_lattice(Nx, Ny, yperiodic = true)
+function SC_rho_opt(psi, Nx, Ny; yperiodic = true)
+    lat = square_lattice(Nx, Ny, yperiodic = yperiodic)
     A = zeros(ComplexF64, length(lat), length(lat))
-    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Adn", "Aup")
-    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Aup", "Adn")
-    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Aup", "Adn") #here I put a plus instead of a minus and it works!
-    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Adn", "Aup")
+    println("First correlator")
+    A .+= correlation_matrix_bond(psi, Nx, Ny, lat, "Adagup", "Adagdn", "Adn", "Aup")
+    println("Second correlator")
+    A .+= correlation_matrix_bond(psi, Nx, Ny, lat, "Adagdn", "Adagup", "Aup", "Adn")
+    println("Third correlator")
+    A .+= correlation_matrix_bond(psi, Nx, Ny, lat, "Adagup", "Adagdn", "Aup", "Adn") #here I put a plus instead of a minus and it works!
+    println("Fourth correlator")
+    A .+= correlation_matrix_bond(psi, Nx, Ny, lat, "Adagdn", "Adagup", "Adn", "Aup")
     return 1/2 .*(A+A')
 end
 
-function SC_rho(psi, Nx, Ny)
+function SC_rho(psi, lat)
 
     ITensors.Strided.set_num_threads(1)
     BLAS.set_num_threads(1)
     ITensors.enable_threaded_blocksparse()
 
     sites = siteinds(psi)  
-    lat = square_lattice(Nx, Ny, yperiodic = true) #generate all bonds   
     C = zeros(ComplexF64, length(lat), length(lat))
     println(length(lat)^2)
     for i in 1:length(lat) #multithreading on 16 threads
@@ -325,9 +317,7 @@ function entanglement_entropy(psi,b)
     return SvN
 end
 
-function main()
-    t = 1; tp = 0.0; J = 0.4; U=(4*t^2)/J; α=1/60; doping = 1/16; max_linkdim = 450
-    Nx = 5; Ny = 4
+function main_obs(; Nx = 2, Ny = 2, tp = 0.2, α=1/60, max_linkdim = 350, yperiodic = true, kwargs...)
 
     println("Observable calculation: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
     f = h5open("data/MPS.h5", "r")
@@ -336,10 +326,10 @@ function main()
 
     EE = @show entanglement_entropy(psi,Int(length(psi)/2))
 
-    C = @time SC_rho_opt(psi, Nx, Ny) #longest process!
+    C = @time SC_rho_opt(psi, Nx, Ny, yperiodic = true) #longest process!
     Cd = correlation_matrix(psi, "Cdagup", "Cup") + correlation_matrix(psi, "Cdagdn", "Cdn")
 
-    h5open("corr.h5","cw") do f
+    h5open("data/corr.h5","cw") do f
         if haskey(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
             delete_object(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
             delete_object(f, "dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
@@ -349,7 +339,7 @@ function main()
     end
 end
 
-main()
+main_obs()
 
 #=
 plt.figure(1, dpi=100)
