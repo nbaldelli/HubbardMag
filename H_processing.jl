@@ -12,17 +12,16 @@ function currents_from_correlation_V3(t, tp, lattice::Vector{LatticeBond}, C, α
     for (ind,b) in enumerate(lattice)
         push!(couples, [(b.x1, b.y1), (b.x2, b.y2)])
         curr_plot[ind] += 1im*t*(b.x2-b.x1)*C[b.s2, b.s1]-1im*t*(b.x2-b.x1)*C[b.s1, b.s2]
-        curr_plot[ind] += -1im*t*(b.y2-b.y1)*exp(2pi*1im*α*(b.x1 - (1-1)/2)*(b.y2-b.y1))*C[b.s1,b.s2]
-        curr_plot[ind] += 1im*t*(b.y2-b.y1)*exp(-2pi*1im*α*(b.x1 - (1-1)/2)*(b.y2-b.y1))*C[b.s2,b.s1]
+        curr_plot[ind] += -1im*t*(b.y2-b.y1)*exp(2pi*1im*α*(b.x1-(Nx+1)/2)*(b.y2-b.y1))*C[b.s1,b.s2]
+        curr_plot[ind] += 1im*t*(b.y2-b.y1)*exp(-2pi*1im*α*(b.x1-(Nx+1)/2)*(b.y2-b.y1))*C[b.s2,b.s1]
     end
     return couples, real(curr_plot)
 end
 
-function main_processing(; Nx = 4, Ny = 3, t = 1, tp = 0.2, J = 0.4, U = 10, α=1/60, doping = 1/16, max_linkdim = 350,
+function main_processing(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U = 10, α=1/60, doping = 1/16, max_linkdim = 450,
                             yperiodic = true, kwargs...)
 
     h5open("data/corr.h5","r") do f
-        @show keys(f)
         SC = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
         corr_dens = read(f,"dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
         dens = real(diag(corr_dens))
@@ -64,7 +63,9 @@ function main_processing(; Nx = 4, Ny = 3, t = 1, tp = 0.2, J = 0.4, U = 10, α=
         #= plot of current and density =#
         num = length(lattice); #choose which eigenvector
         neig = length(lattice)-num+1
-        eig_v = real(vecs[:,num])
+        eig_v = real.(vecs[:,num])
+        println(imag(vecs[1:end,num]))
+
 
         av_pair = zeros(ComplexF64,Nx);
         for (i, b) in enumerate(lattice)
@@ -73,7 +74,9 @@ function main_processing(; Nx = 4, Ny = 3, t = 1, tp = 0.2, J = 0.4, U = 10, α=
 
         plt.figure(3)
         plt.plot(1:Nx,real.(av_pair))
-        plt.scatter(1:Nx,real.(av_pair), label="$α")
+        plt.scatter(1:Nx,real.(av_pair), label="$α, real")
+        plt.plot(1:Nx,imag.(av_pair))
+        plt.scatter(1:Nx,imag.(av_pair), label="$α, imag")
         plt.title("Nx=$Nx, Ny=$Ny maxlinkdim=$max_linkdim")
         plt.grid(true); plt.xlabel("x"); plt.ylabel("Mean pairing")
         plt.legend(title="α")
@@ -95,9 +98,8 @@ function main_processing(; Nx = 4, Ny = 3, t = 1, tp = 0.2, J = 0.4, U = 10, α=
 
         #plt.savefig("fulldens_H_($Nx)_($neig).pdf")
         
-        lattice = square_lattice(Nx, Ny, yperiodic = false)
+        lattice = square_lattice(Nx, Ny, yperiodic = yperiodic)
         couples, curr_plot = currents_from_correlation_V3(t, tp, lattice, corr_dens, α, Nx, Ny) #current
-        println(curr_plot)
         println(sum(curr_plot))
         
         fig, ax = plt.subplots(1, dpi = 150)
@@ -119,4 +121,4 @@ function main_processing(; Nx = 4, Ny = 3, t = 1, tp = 0.2, J = 0.4, U = 10, α=
     end
 end
 
-main_processing()
+#main_processing()

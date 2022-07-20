@@ -174,7 +174,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
         if bond.type == "1"
             pf = bond.y2 - bond.y1
             if abs(pf) > 1.1; pf = -sign(pf) end
-            X = bond.x1 - (Nx-1)/2
+            X = bond.x1 - (Nx+1)/2
             ampo += -t*exp(1im*2pi*α*X*pf), "Cdagup", bond.s1, "Cup", bond.s2 #nearest-neighbour hopping
             ampo += -t*exp(1im*2pi*α*X*pf), "Cdagdn", bond.s1, "Cdn", bond.s2
             ampo += -t*exp(-1im*2pi*α*X*pf), "Cdagup", bond.s2, "Cup", bond.s1
@@ -183,7 +183,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
         if bond.type == "2"
             pf = bond.y2-bond.y1
             if abs(pf)>1.1; pf = -sign(pf) end
-            X = bond.x1 - (Nx-1)/2
+            X = bond.x1 - (Nx+1)/2
             ampo += -tp*exp(1im*2pi*α*(X+0.5)*pf), "Cdagup", bond.s1, "Cup", bond.s2 #next-nearest-neighbour hopping
             ampo += -tp*exp(1im*2pi*α*(X+0.5)*pf), "Cdagdn", bond.s1, "Cdn", bond.s2
             ampo += -tp*exp(-1im*2pi*α*(X+0.5)*pf), "Cdagup", bond.s2, "Cup", bond.s1
@@ -208,9 +208,9 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
     return psi
 end
 
-function main_dmrg(; Nx = 2, Ny = 2, t = 1, tp = 0.2, J = 0.4, U=10., α=1/60, doping = 1/16, 
-                    yperiodic = false,
-                    max_linkdim = 350, reupload = false, prev_alpha = 1/60, psi0 = nothing)
+function main_dmrg(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U=10., α=1/60, doping = 1/16, 
+                    yperiodic = true,
+                    max_linkdim = 450, reupload = true, prev_alpha = 1/60, psi0 = nothing)
 
     if reupload;
         f = h5open("data/MPS.h5","r")
@@ -232,5 +232,5 @@ function main_dmrg(; Nx = 2, Ny = 2, t = 1, tp = 0.2, J = 0.4, U=10., α=1/60, d
     end
 end
 
-main_dmrg()
+#main_dmrg()
 

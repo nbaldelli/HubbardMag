@@ -1,8 +1,9 @@
 using LinearAlgebra, ITensors, ITensors.HDF5, Random 
 
-function correlation_matrix_bond(psi0, Nx, Ny, lat, o1, o2, o3, o4)
+function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
 
     N=Nx*Ny
+    lat = square_lattice(Nx, Ny, yperiodic = true)
     indx = Dict([(b.s1,b.s2)=>i for (i,b) in enumerate(lat)])
     C = zeros(ComplexF64, length(lat), length(lat))
 
@@ -260,17 +261,17 @@ function correlation_matrix_bond(psi0, Nx, Ny, lat, o1, o2, o3, o4)
     return C
 end
 
-function SC_rho_opt(psi, Nx, Ny; yperiodic = true)
-    lat = square_lattice(Nx, Ny, yperiodic = yperiodic)
+function SC_rho_opt(psi, Nx, Ny)
+    lat = square_lattice(Nx, Ny, yperiodic = true)
     A = zeros(ComplexF64, length(lat), length(lat))
     println("First correlator")
-    A .+= correlation_matrix_bond(psi, Nx, Ny, lat, "Adagup", "Adagdn", "Adn", "Aup")
+    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Adn", "Aup")
     println("Second correlator")
-    A .+= correlation_matrix_bond(psi, Nx, Ny, lat, "Adagdn", "Adagup", "Aup", "Adn")
+    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Aup", "Adn")
     println("Third correlator")
-    A .+= correlation_matrix_bond(psi, Nx, Ny, lat, "Adagup", "Adagdn", "Aup", "Adn") #here I put a plus instead of a minus and it works!
+    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Aup", "Adn") #here I put a plus instead of a minus and it works!
     println("Fourth correlator")
-    A .+= correlation_matrix_bond(psi, Nx, Ny, lat, "Adagdn", "Adagup", "Adn", "Aup")
+    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Adn", "Aup")
     return 1/2 .*(A+A')
 end
 
@@ -317,17 +318,16 @@ function entanglement_entropy(psi,b)
     return SvN
 end
 
-function main_obs(; Nx = 2, Ny = 2, tp = 0.2, α=1/60, max_linkdim = 350, yperiodic = true, kwargs...)
-
+function main_obs(; Nx = 6, Ny = 4, tp = 0.2, α=1/60, max_linkdim = 450, yperiodic = true, kwargs...)
     println("Observable calculation: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
     f = h5open("data/MPS.h5", "r")
     psi = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)", MPS)
     close(f)
 
-    EE = @show entanglement_entropy(psi,Int(length(psi)/2))
+    #EE = @show entanglement_entropy(psi,Int(length(psi)/2))
 
-    C = @time SC_rho_opt(psi, Nx, Ny, yperiodic = true) #longest process!
-    Cd = correlation_matrix(psi, "Cdagup", "Cup") + correlation_matrix(psi, "Cdagdn", "Cdn")
+    C = @time SC_rho_opt(psi, Nx, Ny) #longest process!
+    Cd = correlation_matrix(psi, "Cdagup", "Cup") .+ correlation_matrix(psi, "Cdagdn", "Cdn")
 
     h5open("data/corr.h5","cw") do f
         if haskey(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
@@ -339,7 +339,7 @@ function main_obs(; Nx = 2, Ny = 2, tp = 0.2, α=1/60, max_linkdim = 350, yperio
     end
 end
 
-main_obs()
+#main_obs()
 
 #=
 plt.figure(1, dpi=100)
