@@ -147,6 +147,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
     holes = floor(Int,N*doping)
     num_f = N - holes
 
+    #=
     if psi0 === nothing
         sites = siteinds("Electron", N, conserve_qns = true) #number of fermions is conserved, magnetization is zero
         in_state = ["Up" for _ in 1:(floor(num_f/2)-1)]
@@ -155,15 +156,26 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
         append!(in_state, ["0" for _ in 1:(holes+1) ])
         shuffle!(in_state) #DANGER: changes at every run
         println(in_state)
-
         psi0 = randomMPS(sites, in_state, linkdims=10)
+    end
+    =#
+    
+    if psi0 === nothing
+        sites = siteinds("Electron", N, conserve_qns = true) #number of fermions is conserved, magnetization is zero
+        in_state = [isodd(n) ? "Up" : "Dn" for n in 1:N]
+        distr_pol = round.([(Nx/((holes/2)+1))*i for i in 1:Int(holes/2)])
+        distr_holes = [Int.((Ny .* distr_pol) .- (Ny/2))]
+        distr_holes2 = [Int.((Ny .* distr_pol) .- (Ny/2) .+ 1)]
+        in_state[distr_holes...] .= "0"; in_state[(distr_holes2)...] .= "0"; 
+        println(in_state)
+        psi0 = productMPS(sites, in_state)
     end
 
     sites = siteinds(psi0)
 
     #=set up of DMRG schedule=#
     sweeps = Sweeps(60)
-    setmaxdim!(sweeps, max_linkdim)
+    setmaxdim!(sweeps, 500, 1000, 1500, 2000, max_linkdim)
     setcutoff!(sweeps, 1e-9)
     setnoise!(sweeps, 1e-8, 1e-10, 0)
     en_obs = DMRGObserver(energy_tol = 1e-7)
