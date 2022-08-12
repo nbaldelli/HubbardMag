@@ -162,19 +162,19 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
     sites = siteinds(psi0)
 
     #=set up of DMRG schedule=#
-    sweeps = Sweeps(30)
+    sweeps = Sweeps(60)
     setmaxdim!(sweeps, max_linkdim)
     setcutoff!(sweeps, 1e-9)
     setnoise!(sweeps, 1e-8, 1e-10, 0)
     en_obs = DMRGObserver(energy_tol = 1e-7)
-    
+     
     #= hamiltonian definition hubbard=#
     ampo = OpSum()  
     for bond in lattice
         if bond.type == "1"
             pf = bond.y2 - bond.y1
             if abs(pf) > 1.1; pf = -sign(pf) end
-            X = bond.x1 - (Nx+1)/2
+            X = bond.x1 - (Nx)/2
             ampo += -t*exp(1im*2pi*α*X*pf), "Cdagup", bond.s1, "Cup", bond.s2 #nearest-neighbour hopping
             ampo += -t*exp(1im*2pi*α*X*pf), "Cdagdn", bond.s1, "Cdn", bond.s2
             ampo += -t*exp(-1im*2pi*α*X*pf), "Cdagup", bond.s2, "Cup", bond.s1
@@ -183,7 +183,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
         if bond.type == "2"
             pf = bond.y2-bond.y1
             if abs(pf)>1.1; pf = -sign(pf) end
-            X = bond.x1 - (Nx+1)/2
+            X = bond.x1 - (Nx)/2
             ampo += -tp*exp(1im*2pi*α*(X+0.5)*pf), "Cdagup", bond.s1, "Cup", bond.s2 #next-nearest-neighbour hopping
             ampo += -tp*exp(1im*2pi*α*(X+0.5)*pf), "Cdagdn", bond.s1, "Cdn", bond.s2
             ampo += -tp*exp(-1im*2pi*α*(X+0.5)*pf), "Cdagup", bond.s2, "Cup", bond.s1
@@ -213,7 +213,7 @@ function main_dmrg(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U=10., α=1/60, d
                     max_linkdim = 450, reupload = true, prev_alpha = 1/60, psi0 = nothing)
 
     if reupload;
-        f = h5open("data/MPS.h5","r")
+        f = h5open("ceph/MPS.h5","r")
         psi0 = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($prev_alpha)_mlink($max_linkdim)",MPS)
         close(f)
     end
@@ -224,7 +224,7 @@ function main_dmrg(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U=10., α=1/60, d
     #psi = dmrg_run_tj(Nx, Ny, t, tp, J, doping = doping, maxlinkdim = maxlinkdim)
     psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice, psi0=psi0, α=α, doping = doping, max_linkdim = max_linkdim)
 
-    h5open("data/MPS.h5","cw") do f
+    h5open("ceph/MPS.h5","cw") do f
         if haskey(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
             delete_object(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
         end

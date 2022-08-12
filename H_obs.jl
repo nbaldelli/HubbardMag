@@ -320,16 +320,16 @@ end
 
 function main_obs(; Nx = 6, Ny = 4, tp = 0.2, α=1/60, max_linkdim = 450, yperiodic = true, kwargs...)
     println("Observable calculation: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
-    f = h5open("data/MPS.h5", "r")
+    f = h5open("ceph/MPS.h5", "r")
     psi = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)", MPS)
     close(f)
 
-    #EE = @show entanglement_entropy(psi,Int(length(psi)/2))
+    EE = @show entanglement_entropy(psi,Int(length(psi)/2))
 
     C = @time SC_rho_opt(psi, Nx, Ny) #longest process!
     Cd = correlation_matrix(psi, "Cdagup", "Cup") .+ correlation_matrix(psi, "Cdagdn", "Cdn")
 
-    h5open("data/corr.h5","cw") do f
+    h5open("corr.h5","cw") do f
         if haskey(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
             delete_object(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
             delete_object(f, "dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
