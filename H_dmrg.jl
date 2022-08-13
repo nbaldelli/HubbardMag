@@ -159,10 +159,14 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
         psi0 = randomMPS(sites, in_state, linkdims=10)
     end
     =#
-    
+
     if psi0 === nothing
         sites = siteinds("Electron", N, conserve_qns = true) #number of fermions is conserved, magnetization is zero
-        in_state = [isodd(n) ? "Up" : "Dn" for n in 1:N]
+        in_state = []
+        for i in 1:Int(Nx/2)
+            push!(in_state, [isodd(n) ? "Up" : "Dn" for n in 1:Ny]...)
+            push!(in_state, [isodd(n) ? "Dn" : "Up" for n in 1:Ny]...)
+        end
         distr_pol = round.([(Nx/((holes/2)+1))*i for i in 1:Int(holes/2)])
         distr_holes = [Int.((Ny .* distr_pol) .- (Ny/2))]
         distr_holes2 = [Int.((Ny .* distr_pol) .- (Ny/2) .+ 1)]
