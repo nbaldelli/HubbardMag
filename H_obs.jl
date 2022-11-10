@@ -261,17 +261,22 @@ function correlation_matrix_bond(psi0, Nx, Ny, o1, o2, o3, o4)
     return C
 end
 
-function SC_rho_opt(psi, Nx, Ny)
+function SC_rho_opt(psi, Nx, Ny, type)
     lat = square_lattice(Nx, Ny, yperiodic = true)
     A = zeros(ComplexF64, length(lat), length(lat))
     println("First correlator")
-    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Adn", "Aup")
-    println("Second correlator")
-    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Aup", "Adn")
-    println("Third correlator")
-    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Aup", "Adn") #here I put a plus instead of a minus and it works!
-    println("Fourth correlator")
-    A .+= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Adn", "Aup")
+    if type == 1
+        A .= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Adn", "Aup")
+    end
+    if type == 2
+        A .= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Aup", "Adn")
+    end
+    if type == 3
+        A .= correlation_matrix_bond(psi, Nx, Ny, "Adagup", "Adagdn", "Aup", "Adn") #here I put a plus instead of a minus and it works!
+    end
+    if type == 4
+        A .= correlation_matrix_bond(psi, Nx, Ny, "Adagdn", "Adagup", "Adn", "Aup")
+    end
     return 1/2 .*(A+A')
 end
 
@@ -318,7 +323,7 @@ function entanglement_entropy(psi,b)
     return SvN
 end
 
-function main_obs(; Nx = 6, Ny = 4, tp = 0.2, α=1/60, max_linkdim = 450, yperiodic = true, kwargs...)
+function main_obs(; Nx = 6, Ny = 4, tp = 0.2, α=1/60, max_linkdim = 450, yperiodic = true, type = 1, kwargs...)
     println("Observable calculation: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
     f = h5open("ceph/MPS.h5", "r")
     psi = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)", MPS)
@@ -326,15 +331,15 @@ function main_obs(; Nx = 6, Ny = 4, tp = 0.2, α=1/60, max_linkdim = 450, yperio
 
     EE = @show entanglement_entropy(psi,Int(length(psi)/2))
 
-    C = @time SC_rho_opt(psi, Nx, Ny) #longest process!
+    C = @time SC_rho_opt(psi, Nx, Ny, type) #longest process!
     Cd = correlation_matrix(psi, "Cdagup", "Cup") .+ correlation_matrix(psi, "Cdagdn", "Cdn")
 
     h5open("corr.h5","cw") do f
-        if haskey(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
-            delete_object(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
+        if haskey(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)_$type")
+            delete_object(f, "SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)_$type")
             delete_object(f, "dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
         end
-        write(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)",C)
+        write(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)_$type",C)
         write(f,"dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)",Cd)
     end
 end

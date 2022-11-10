@@ -147,7 +147,8 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
     holes = floor(Int,N*doping)
     num_f = N - holes
 
-    #=
+    #Random.seed!(1234)
+    
     if psi0 === nothing
         sites = siteinds("Electron", N, conserve_qns = true) #number of fermions is conserved, magnetization is zero
         in_state = ["Up" for _ in 1:(floor(num_f/2)-1)]
@@ -158,8 +159,8 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
         println(in_state)
         psi0 = randomMPS(sites, in_state, linkdims=10)
     end
-    =#
-
+    
+    #=
     if psi0 === nothing
         sites = siteinds("Electron", N, conserve_qns = true) #number of fermions is conserved, magnetization is zero
         in_state = []
@@ -174,7 +175,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
         println(in_state)
         psi0 = productMPS(sites, in_state)
     end
-
+    =#
     sites = siteinds(psi0)
 
     #=set up of DMRG schedule=#
@@ -225,7 +226,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
 end
 
 function main_dmrg(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U=10., α=1/60, doping = 1/16, 
-                    yperiodic = true,
+                    yperiodic = true, type = nothing,
                     max_linkdim = 450, reupload = true, prev_alpha = 1/60, psi0 = nothing)
 
     if reupload;
@@ -240,12 +241,14 @@ function main_dmrg(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U=10., α=1/60, d
     #psi = dmrg_run_tj(Nx, Ny, t, tp, J, doping = doping, maxlinkdim = maxlinkdim)
     psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice, psi0=psi0, α=α, doping = doping, max_linkdim = max_linkdim)
 
+    #=
     h5open("ceph/MPS.h5","cw") do f
         if haskey(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
             delete_object(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
         end
         write(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)",psi)
     end
+    =#
 end
 
 #main_dmrg()
