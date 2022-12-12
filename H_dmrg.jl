@@ -179,11 +179,11 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
     sites = siteinds(psi0)
 
     #=set up of DMRG schedule=#
-    sweeps = Sweeps(60)
+    sweeps = Sweeps(20)
     setmaxdim!(sweeps, 500, 1000, 1500, 2000, max_linkdim)
     setcutoff!(sweeps, 1e-9)
     setnoise!(sweeps, 1e-8, 1e-10, 0)
-    en_obs = DMRGObserver(energy_tol = 1e-7)
+    en_obs = DMRGObserver(energy_tol = 1e-6)
      
     #= hamiltonian definition hubbard=#
     ampo = OpSum()  

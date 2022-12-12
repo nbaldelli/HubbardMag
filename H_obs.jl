@@ -324,7 +324,7 @@ function entanglement_entropy(psi,b)
 end
 
 function main_obs(; Nx = 6, Ny = 4, tp = 0.2, α=1/60, max_linkdim = 450, yperiodic = true, type = 1, kwargs...)
-    println("Observable calculation: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
+    println("Observable calculation: #threads=$(Threads.nthreads()), tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)_$type")
     f = h5open("ceph/MPS.h5", "r")
     psi = read(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)", MPS)
     close(f)

@@ -1,8 +1,7 @@
 using LinearAlgebra, ITensors, ITensors.HDF5, Random
 using ITensorParallel
-using ITensorTDVP
-using Distributed, SlurmClusterManager
 using MPI
+MPI.Init()
 
 include(joinpath(pkgdir(ITensors), "examples", "src", "electronk.jl"))
 include(joinpath(pkgdir(ITensors), "examples", "src", "hubbard.jl"))
@@ -162,9 +161,7 @@ function main_parallel_dist(;
       Hs = partition(os, nprocs; in_partition=in_partition)  
       n = MPI.Comm_rank(MPI.COMM_WORLD) + 1
       PH = MPISum(ProjMPO(MPO(Hs[n], sites)))
-      @show maxlinkdim.(PH)
-      @show nnz(PH[1][end ÷ 2])
-      @show nnzblocks(PH[1][end ÷ 2])  
+      println("MPO distributed Hamiltonian")
     else
       PH = MPO(os, sites)
       @show maxlinkdim(PH)
