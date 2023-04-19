@@ -5,6 +5,7 @@ const plt = PyPlot;
 plt.matplotlib.use("TkAgg"); ENV["MPLBACKEND"] = "TkAgg"; plt.pygui(true); plt.ion()
 
 using LinearAlgebra, ITensors, ITensors.HDF5, Random
+using DelimitedFiles
 
 function currents_from_correlation_V3(t, tp, lattice::Vector{LatticeBond}, C, α, Nx, Ny)
     curr_plot = zeros(ComplexF64,length(lattice))
@@ -12,8 +13,8 @@ function currents_from_correlation_V3(t, tp, lattice::Vector{LatticeBond}, C, α
     for (ind,b) in enumerate(lattice)
         push!(couples, [(b.x1, b.y1), (b.x2, b.y2)])
         curr_plot[ind] += 1im*t*(b.x2-b.x1)*C[b.s2, b.s1]-1im*t*(b.x2-b.x1)*C[b.s1, b.s2]
-        curr_plot[ind] += -1im*t*(b.y2-b.y1)*exp(2pi*1im*α*(b.x1-(Nx)/2)*(b.y2-b.y1))*C[b.s1,b.s2]
-        curr_plot[ind] += 1im*t*(b.y2-b.y1)*exp(-2pi*1im*α*(b.x1-(Nx)/2)*(b.y2-b.y1))*C[b.s2,b.s1]
+        curr_plot[ind] += -1im*t*(b.y2-b.y1)*exp(2pi*1im*α*(b.x1-(Nx+1)/2)*(b.y2-b.y1))*C[b.s1,b.s2]
+        curr_plot[ind] += 1im*t*(b.y2-b.y1)*exp(-2pi*1im*α*(b.x1-(Nx+1)/2)*(b.y2-b.y1))*C[b.s2,b.s1]
     end
     return couples, real(curr_plot)
 end
@@ -68,11 +69,12 @@ function main_processing(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U = 10, α=
                             yperiodic = true, kwargs...)
 
     h5open("corr.h5","r") do f
+        #α = α /((Nx-1)*Ny)
         SC_1 = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_d($doping)_alpha_($α)_mlink($max_linkdim)_1")        
         SC_2 = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_d($doping)_alpha_($α)_mlink($max_linkdim)_2")        
         SC_3 = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_d($doping)_alpha_($α)_mlink($max_linkdim)_3")        
         SC_4 = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_d($doping)_alpha_($α)_mlink($max_linkdim)_4")        
-
+        #SC = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
         SC = SC_1 .+ SC_2 .+ SC_3 .+ SC_4
 
         corr_dens = read(f,"dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_d($doping)_alpha_($α)_mlink($max_linkdim)")
@@ -86,7 +88,10 @@ function main_processing(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U = 10, α=
             mean_dens[i] = sum(dens[(1+(i-1)*Ny):(i*Ny)])/Ny
         end
         dens = 1 .- diag(corr_dens)
-        
+        open("dens.txt", "a") do io
+            writedlm(io,real.(dens))
+         end
+
         Cd = SC+SC'
         vals, vecs = eigen(Cd)
 
@@ -124,15 +129,16 @@ function main_processing(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U = 10, α=
 
         av_pair = zeros(ComplexF64, Nx, Ny);
         for (i, b) in enumerate(lattice), j in 1:Ny
-            av_pair[Int(b.x1),j] += (-1)^(b.x2-b.x1)*(vecs[i,num-j+1])
+            av_pair[Int(b.x1),j] += (1)^(b.x2-b.x1)*abs.(vecs[i,num-j+1])
         end
 
         fig, host = plt.subplots(figsize=(8,6), dpi = 250)
         par1 = host.twinx()
+
         host.plot(1:Nx,mean_dens, "-o", color="black", label="Hole dens.")
-        par1.plot(1:Nx,-real.(av_pair[:,1]), "-s", label="1")
-        par1.plot(1:Nx,real.(av_pair[:,2]), "-^", label="2")
-        par1.plot(1:Nx,real.(av_pair[:,3]), "-*", label="4")
+        par1.plot(1:Nx,real.(av_pair[:,1] ./sqrt(sum(av_pair[:,1].^2))), "-s", label="1")
+        par1.plot(1:Nx,real.(av_pair[:,2] ./sqrt(sum(av_pair[:,2].^2))), "-^", label="2")
+        #par1.plot(1:Nx,real.(av_pair[:,3] ./sqrt(sum(av_pair[:,3].^2))), "-*", label="3")
         #par1.plot(1:Nx,real.(av_pair[:,5]), "-x", label="5")
         #plt.title("Nx=$Nx, Ny=$Ny, α=$α, maxlinkdim=$max_linkdim")
         #plt.grid(true); 
@@ -183,6 +189,7 @@ function main_processing(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U = 10, α=
         U .= real.(eig_v) #./abs.(eig_v)
         V .= imag.(eig_v) #./abs.(eig_v) 
         C = abs.(eig_v)
+        println(maximum(C))
 
         pl_quiver = ax.quiver(X,Y,U,V,C, scale_units="inches", scale=0.9, headlength=5)
         pl_dens = ax.scatter(repeat(1:Nx, inner = Ny), repeat(1:Ny,Nx), c=dens, s=25, marker="s", zorder = 1, cmap=plt.get_cmap("Greys"), edgecolors="black")
@@ -242,3 +249,63 @@ function main_processing(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U = 10, α=
     end
     =#
 end
+
+function hdf5_to_txt(; Nx = 24, Ny = 6, t = 1, tp = 0.2, J = 0.4, U = 10, α=6.0, doping = 1/36,  max_linkdim = 4001, nn = 1)
+    h5open("corr.h5","r") do f
+        α = α/((Nx-1)*Ny)
+        SC_1 = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_d($doping)_alpha_($α)_mlink($max_linkdim)_1")        
+        SC_2 = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_d($doping)_alpha_($α)_mlink($max_linkdim)_2")        
+        SC_3 = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_d($doping)_alpha_($α)_mlink($max_linkdim)_3")        
+        SC_4 = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_d($doping)_alpha_($α)_mlink($max_linkdim)_4")        
+
+        #SC = read(f,"SC_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
+        SC = SC_1 .+ SC_2 .+ SC_3 .+ SC_4
+
+        corr_dens = read(f,"dens_H_tp($tp)_Nx($Nx)_Ny($Ny)_d($doping)_alpha_($α)_mlink($max_linkdim)")
+        dens = real(diag(corr_dens))
+
+        plot_alpha = α * ((Nx-1)*Ny)
+        nholes = Int(floor(doping*Nx*Ny))
+        BC = "O"
+        
+        open("dens_tp($tp)_Nx($Nx)_Ny($Ny)_nholes($nholes)_alpha_($plot_alpha)_mlink($max_linkdim)_$BC.txt", "w") do io
+            writedlm(io,real.(dens))
+            end
+
+        Cd = SC+SC'
+        vals, vecs = eigen(Cd)
+
+        couples = Any[]
+        lattice = square_lattice(Nx, Ny, yperiodic = true)
+        for b in lattice
+            push!(couples, [(b.x1, b.y1), (b.x2, b.y2)])
+        end
+
+        #= plot of current and density =#
+        num = length(lattice)-nn+1; #choose which eigenvector
+        neig = length(lattice)-num+1
+        eig_v = (vecs[:,num])
+
+        #pl_curr = ax.add_collection(line_segments)
+        X = zeros(length(couples)); Y = zeros(length(couples))
+        U = zeros(length(couples)); V = zeros(length(couples))
+        C = zeros(length(couples))
+
+        for i in 1:length(couples)
+            X[i] =(couples[i][1][1]+couples[i][2][1])/2
+            Y[i] =(couples[i][1][2]+couples[i][2][2])/2
+            if (couples[i][2][2]==Ny+1) Y[i] = Ny+0.5 end
+        end
+
+        U .= real.(eig_v) #./abs.(eig_v)
+        V .= imag.(eig_v) #./abs.(eig_v) 
+        C = abs.(eig_v)
+        SC_data = [X Y U V C]
+        open("SC_tp($tp)_Nx($Nx)_Ny($Ny)_nholes($nholes)_alpha_($plot_alpha)_mlink($max_linkdim)_neig($neig)_$BC.txt.txt", "w") do io
+            writedlm(io,SC_data)
+        end
+    end
+end
+
+#main_processing(; Nx = 32, Ny = 4, t = 1, tp = 0.2, J = 0.4, U = 10, α=5.0, doping = 1/16,  max_linkdim = 3000,)
+hdf5_to_txt()

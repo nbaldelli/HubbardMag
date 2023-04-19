@@ -180,7 +180,7 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
 
     #=set up of DMRG schedule=#
     sweeps = Sweeps(20)
-    setmaxdim!(sweeps, 500, 1000, 1500, 2000, max_linkdim)
+    setmaxdim!(sweeps, 500, max_linkdim)
     setcutoff!(sweeps, 1e-9)
     setnoise!(sweeps, 1e-8, 1e-10, 0)
     en_obs = DMRGObserver(energy_tol = 1e-6)
@@ -222,12 +222,19 @@ function dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice; psi0=nothing, α=0, doping 
     energy, psi = @time dmrg(H, psi0, sweeps, observer = en_obs, verbose=false);
     ####################################
     #= observables computation =#
+
+    C = correlation_matrix(psi, "Cdagup", "Cup")
+    Cd = correlation_matrix(psi, "Cdagdn", "Cdn")
+    display(diag(C .+ Cd))
+    plt.imshow(reshape(diag(C .+ Cd), Ny, Nx))
+    
+
     return psi
 end
 
-function main_dmrg(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U=10., α=1/60, doping = 1/16, 
+function main_dmrg(; Nx = 4, Ny = 4, t = 1, tp = 0.0, J = 0.4, U=10., α=0/60, doping = 0/16, 
                     yperiodic = true, type = nothing,
-                    max_linkdim = 450, reupload = true, prev_alpha = 1/60, psi0 = nothing)
+                    max_linkdim = 900, reupload = false, prev_alpha = 1/60, psi0 = nothing)
 
     if reupload;
         f = h5open("ceph/MPS.h5","r")
@@ -241,15 +248,15 @@ function main_dmrg(; Nx = 6, Ny = 4, t = 1, tp = 0.2, J = 0.4, U=10., α=1/60, d
     #psi = dmrg_run_tj(Nx, Ny, t, tp, J, doping = doping, maxlinkdim = maxlinkdim)
     psi = dmrg_run_hubbard(Nx, Ny, t, tp, U, lattice, psi0=psi0, α=α, doping = doping, max_linkdim = max_linkdim)
 
-    #=
+    
     h5open("ceph/MPS.h5","cw") do f
         if haskey(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
             delete_object(f, "psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)")
         end
         write(f,"psi_H_tp($tp)_Nx($Nx)_Ny($Ny)_alpha_($α)_mlink($max_linkdim)",psi)
     end
-    =#
+    
 end
 
-#main_dmrg()
+main_dmrg()
 

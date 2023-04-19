@@ -169,7 +169,7 @@ function main_parallel_dist(;
 
     # Number of structural nonzero elements in a bulk
     # Hamiltonian MPO tensor
-   
+
     #Random.seed!(1234)
     # Create start state
     if psi0 === nothing
@@ -181,8 +181,7 @@ function main_parallel_dist(;
         println(in_state)
         psi0 = randomMPS(sites, in_state, linkdims=10)
     end
-    
-    
+
     energy, psi = @time dmrg(
       PH, psi0, sweeps; svd_alg="divide_and_conquer", observer = en_obs
     )
@@ -192,7 +191,6 @@ function main_parallel_dist(;
     @show maxlinkdim(psi)
     @show energy
     #return energy, H, psi
-    
 end
 
 function main_ky(;
@@ -342,3 +340,61 @@ end
 # where is the autofermion?
 # can we do correlators with MPOs efficiently instead of applying single gate?
 
+
+
+#MPO dimensions for various choices of Ny, number of distributed MPOs
+#Ny = 3, maxlinkdim = 20, maxlinkdim_distributed = 14, #processes = 6
+#Ny = 4, maxlinkdim = 36, maxlinkdim_distributed = 16, #processes = 8
+#Ny = 5, maxlinkdim = 40, maxlinkdim_distributed = 20, #processes = 10
+#Ny = 6, maxlinkdim = 56, maxlinkdim_distributed = 28, #processes = 12
+#Ny = 8, maxlinkdim = 76, maxlinkdim_distributed = 42, #processes = 17 (the one at 25 is 32 tho!!)
+
+#please write in a matrix the values of Ny and maxlinkdim_distributed of previous lines
+#=
+nys = [3, 4, 5, 6, 8]
+maxlinkdims = [20, 36, 40, 56, 76]
+maxlinkdim_distributed = [14, 16, 20, 28, 42]
+processes = [6, 8, 10, 12, 17]
+
+plt.plot(nys, maxlinkdims, label = "MPOs maxlinkdim")
+plt.plot(nys, maxlinkdim_distributed, label = "distributed MPOs maxlinkdim")
+plt.plot(nys, processes, label = "# optimal processes")
+plt.xlabel("Ny")
+plt.grid()
+plt.legend()
+plt.savefig("maxlinkdim_vs_Ny.png")
+plt.show()
+=#
+#runtimes
+#Threaded blocksparse: (10 x 4, 8 threads)
+#maxlinkdim = 500, time = 57
+#maxlinkdim = 1000, time = 116
+#maxlinkdim = 2000, time = 243
+#maxlinkdim = 3000, time = 351
+
+#Threaded MPO: (10 x 4, 8 threads)
+#maxlinkdim = 500, time = 62
+#maxlinkdim = 1000, time = 127
+#maxlinkdim = 2000, time = 294
+#maxlinkdim = 3000, time = 442
+
+#MPI: (10 x 4, 8 processes)
+#maxlinkdim = 500, time = 23
+#maxlinkdim = 1000, time = 46
+#maxlinkdim = 2000, time = 97
+#maxlinkdim = 3000, time = 145
+
+bond_dimensions = [500, 1000, 2000, 3000]
+runtimes = [57, 116, 243, 351]
+runtimes_mpi = [23, 46, 97, 145]
+runtimes_threaded_mpo = [62, 127, 294, 442]
+
+plt.plot(bond_dimensions, runtimes, label = "threaded blocksparse")
+plt.plot(bond_dimensions, runtimes_mpi, label = "MPI")
+plt.plot(bond_dimensions, runtimes_threaded_mpo, label = "threaded MPO")
+plt.xlabel("maxlinkdim")
+plt.ylabel("signle sweep runtime [s]")
+plt.grid()
+plt.legend()
+plt.savefig("runtimes.png")
+plt.show()
